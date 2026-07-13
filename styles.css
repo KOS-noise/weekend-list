@@ -1,0 +1,277 @@
+:root {
+  --ink: #111111;
+  --line: #1a1a1a;
+  --header-bg: #f3f1eb;
+  --paper: #ffffff;
+  --muted: #666666;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #e8e6e0;
+  color: var(--ink);
+  font-family: "Noto Sans KR", sans-serif;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  padding: 18px;
+}
+
+.page {
+  width: min(1080px, 100%);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 28px 28px 16px;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 14px;
+  min-height: calc(100vh - 36px);
+}
+
+.header {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 56px;
+  padding-bottom: 4px;
+}
+
+.title {
+  margin: 0;
+  font-family: "Cormorant Garamond", "Times New Roman", serif;
+  font-weight: 600;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.week-nav {
+  position: absolute;
+  left: 0;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.week-btn {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.week-btn:hover {
+  background: var(--header-bg);
+}
+
+.week-btn:active {
+  background: #e6e2d8;
+}
+
+.week-btn-text {
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  min-width: auto;
+  padding: 0 10px;
+}
+
+.week-btn-text:disabled,
+.week-btn-text.is-current {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.date-field {
+  position: absolute;
+  right: 0;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "Noto Sans KR", sans-serif;
+}
+
+.date-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.date-input {
+  width: min(240px, 30vw);
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  outline: none;
+  font-size: 0.9rem;
+  font-family: inherit;
+  padding: 2px 0;
+  color: var(--ink);
+  cursor: default;
+}
+
+.days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+  min-height: 0;
+  border: 1px solid var(--line);
+}
+
+.day-col {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+}
+
+.day-col:last-child {
+  border-right: none;
+}
+
+.day-header {
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+  padding: 8px 4px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+}
+
+.day-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.day-date {
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.day-col.is-today .day-header {
+  background: #ebe7dc;
+}
+
+.day-col.is-today .day-name {
+  font-weight: 700;
+}
+
+.day-body,
+.note-body {
+  width: 100%;
+  height: 100%;
+  border: none;
+  resize: none;
+  outline: none;
+  background: transparent;
+  padding: 10px 8px;
+  font-family: "Noto Sans KR", sans-serif;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.note-box {
+  border: 1px solid var(--line);
+  min-height: 150px;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.note-label {
+  padding: 10px 12px 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.note-body {
+  padding: 8px 12px 12px;
+  min-height: 110px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.autostart {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  user-select: none;
+  cursor: pointer;
+}
+
+.autostart input {
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+
+.save-status {
+  font-size: 0.78rem;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+@media (max-width: 860px) {
+  body {
+    padding: 8px;
+  }
+
+  .page {
+    padding: 16px 12px 10px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .week-nav,
+  .date-field {
+    position: static;
+  }
+
+  .days {
+    grid-template-columns: 1fr;
+  }
+
+  .day-col {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    min-height: 140px;
+  }
+
+  .day-col:last-child {
+    border-bottom: none;
+  }
+}

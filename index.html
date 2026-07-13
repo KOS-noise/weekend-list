@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'" />
+  <title>Weekly Planner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <h1 class="title">Weekly Planner</h1>
+      <div class="week-nav" aria-label="주간 이동">
+        <button type="button" id="prevWeekBtn" class="week-btn" title="지난주">‹</button>
+        <button type="button" id="thisWeekBtn" class="week-btn week-btn-text" title="이번 주로">이번 주</button>
+        <button type="button" id="nextWeekBtn" class="week-btn" title="다음주">›</button>
+      </div>
+      <label class="date-field">
+        <span class="date-label">DATE:</span>
+        <input id="dateInput" class="date-input" type="text" readonly spellcheck="false" />
+      </label>
+    </header>
+
+    <main class="days" id="daysGrid">
+      <section class="day-col" data-day="mon">
+        <div class="day-header">
+          <span class="day-name">월요일</span>
+          <span class="day-date" data-date-for="mon"></span>
+        </div>
+        <textarea class="day-body" data-key="mon" placeholder=""></textarea>
+      </section>
+      <section class="day-col" data-day="tue">
+        <div class="day-header">
+          <span class="day-name">화요일</span>
+          <span class="day-date" data-date-for="tue"></span>
+        </div>
+        <textarea class="day-body" data-key="tue" placeholder=""></textarea>
+      </section>
+      <section class="day-col" data-day="wed">
+        <div class="day-header">
+          <span class="day-name">수요일</span>
+          <span class="day-date" data-date-for="wed"></span>
+        </div>
+        <textarea class="day-body" data-key="wed" placeholder=""></textarea>
+      </section>
+      <section class="day-col" data-day="thu">
+        <div class="day-header">
+          <span class="day-name">목요일</span>
+          <span class="day-date" data-date-for="thu"></span>
+        </div>
+        <textarea class="day-body" data-key="thu" placeholder=""></textarea>
+      </section>
+      <section class="day-col" data-day="fri">
+        <div class="day-header">
+          <span class="day-name">금요일</span>
+          <span class="day-date" data-date-for="fri"></span>
+        </div>
+        <textarea class="day-body" data-key="fri" placeholder=""></textarea>
+      </section>
+      <section class="day-col" data-day="sat">
+        <div class="day-header">
+          <span class="day-name">토요일</span>
+          <span class="day-date" data-date-for="sat"></span>
+        </div>
+        <textarea class="day-body" data-key="sat" placeholder=""></textarea>
+      </section>
+      <section class="day-col" data-day="sun">
+        <div class="day-header">
+          <span class="day-name">일요일</span>
+          <span class="day-date" data-date-for="sun"></span>
+        </div>
+        <textarea class="day-body" data-key="sun" placeholder=""></textarea>
+      </section>
+    </main>
+
+    <section class="note-box">
+      <div class="note-label">NOTE</div>
+      <textarea id="noteInput" class="note-body" placeholder=""></textarea>
+    </section>
+
+    <footer class="footer">
+      <label class="autostart">
+        <input id="autoStartToggle" type="checkbox" />
+        컴퓨터 시작 시 자동 실행
+      </label>
+      <span id="saveStatus" class="save-status" aria-live="polite"></span>
+    </footer>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
