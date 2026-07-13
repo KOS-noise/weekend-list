@@ -292,7 +292,9 @@ function scheduleSave() {
     if (result.ok) {
       showStatus('클라우드 저장됨');
     } else {
-      showStatus(result.cached ? '로컬만 저장됨' : `저장 실패: ${result.error || ''}`, true);
+      const reason = result.error || '알 수 없는 오류';
+      showStatus(`로컬만 저장됨: ${reason}`, true);
+      console.error('save failed', result);
     }
   }, 450);
 }

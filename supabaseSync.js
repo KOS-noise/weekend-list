@@ -1,8 +1,19 @@
 const path = require('path');
+const { randomUUID } = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
+const ws = require('ws');
+
+// Electron(Node 20)에는 네이티브 WebSocket이 없어 polyfill 필요
+if (typeof globalThis.WebSocket === 'undefined') {
+  globalThis.WebSocket = ws;
+}
+
+// Electron/main에서 먼저 로드해도 안전하도록 여기서도 로드
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+let saveQueue = Promise.resolve();
 
 function emptyTasks() {
   return Object.fromEntries(DAY_KEYS.map((key) => [key, []]));
@@ -19,7 +30,6 @@ function normalizeSupabaseUrl(raw) {
   let url = cleanEnv(raw);
   if (!url) return '';
 
-  // 프로젝트 ref만 넣은 경우 → https://xxxx.supabase.co
   if (!/^https?:\/\//i.test(url) && !url.includes('.')) {
     url = `https://${url}.supabase.co`;
   } else if (!/^https?:\/\//i.test(url)) {
@@ -39,19 +49,27 @@ function getConfig() {
 function createSupabase() {
   const { url, key, syncCode } = getConfig();
   if (!url || !key || !syncCode) {
-    return { client: null, syncCode: null, error: 'MISSING_ENV' };
+    return {
+      client: null,
+      syncCode: null,
+      error: `MISSING_ENV (url:${Boolean(url)} key:${Boolean(key)} sync:${Boolean(syncCode)})`,
+    };
   }
   if (!/^https?:\/\//i.test(url)) {
     return {
       client: null,
       syncCode: null,
-      error: 'INVALID_URL (.env의 SUPABASE_URL은 https://프로젝트ID.supabase.co 형식이어야 합니다)',
+      error: 'INVALID_URL',
     };
   }
 
   try {
     return {
-      client: createClient(url, key),
+      client: createClient(url, key, {
+        realtime: {
+          transport: ws,
+        },
+      }),
       syncCode,
       error: null,
     };
@@ -127,7 +145,71 @@ async function loadWeek(weekKey) {
   }
 }
 
-async function saveWeek(weekKey, payload) {
+async function ensureWeekId(client, syncCode, weekKey, note, now) {
+  const { data: existing, error: findError } = await client
+    .from('planner_weeks')
+    .select('id')
+    .eq('sync_code', syncCode)
+    .eq('week_key', weekKey)
+    .maybeSingle();
+
+  if (findError) {
+    throw new Error(findError.message);
+  }
+
+  if (existing?.id) {
+    const { error: updateError } = await client
+      .from('planner_weeks')
+      .update({ note, updated_at: now })
+      .eq('id', existing.id);
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+    return existing.id;
+  }
+
+  const newId = randomUUID();
+  const { data: inserted, error: insertWeekError } = await client
+    .from('planner_weeks')
+    .insert({
+      id: newId,
+      sync_code: syncCode,
+      week_key: weekKey,
+      note,
+      updated_at: now,
+    })
+    .select('id')
+    .single();
+
+  if (insertWeekError) {
+    throw new Error(insertWeekError.message);
+  }
+  return inserted.id;
+}
+
+function buildTaskRows(weekId, tasksByDay, now) {
+  const rows = [];
+  DAY_KEYS.forEach((day) => {
+    const list = Array.isArray(tasksByDay[day]) ? tasksByDay[day] : [];
+    list.forEach((task, index) => {
+      const content = String(task?.content || '').trim();
+      if (!content) return;
+      rows.push({
+        id: randomUUID(),
+        week_id: weekId,
+        day,
+        content,
+        is_done: Boolean(task.is_done),
+        sort_order: Number.isFinite(task.sort_order) ? task.sort_order : index,
+        created_at: now,
+        updated_at: now,
+      });
+    });
+  });
+  return rows;
+}
+
+async function saveWeekUnlocked(weekKey, payload) {
   const { client, syncCode, error } = createSupabase();
   if (error) {
     return { ok: false, error };
@@ -137,50 +219,18 @@ async function saveWeek(weekKey, payload) {
     const note = payload?.note || '';
     const tasksByDay = payload?.tasks || emptyTasks();
     const now = new Date().toISOString();
+    const weekId = await ensureWeekId(client, syncCode, weekKey, note, now);
+    const rows = buildTaskRows(weekId, tasksByDay, now);
 
-    const { data: week, error: upsertError } = await client
-      .from('planner_weeks')
-      .upsert(
-        {
-          sync_code: syncCode,
-          week_key: weekKey,
-          note,
-          updated_at: now,
-        },
-        { onConflict: 'sync_code,week_key' }
-      )
-      .select('id')
-      .single();
-
-    if (upsertError) {
-      return { ok: false, error: upsertError.message };
-    }
-
-    const { error: deleteError } = await client
+    // 기존 할 일 id를 기억해 두고, 새 행 insert 성공 후에만 삭제 (중간 실패 시 데이터 보존)
+    const { data: oldTasks, error: oldError } = await client
       .from('planner_tasks')
-      .delete()
-      .eq('week_id', week.id);
+      .select('id')
+      .eq('week_id', weekId);
 
-    if (deleteError) {
-      return { ok: false, error: deleteError.message };
+    if (oldError) {
+      return { ok: false, error: oldError.message };
     }
-
-    const rows = [];
-    DAY_KEYS.forEach((day) => {
-      const list = Array.isArray(tasksByDay[day]) ? tasksByDay[day] : [];
-      list.forEach((task, index) => {
-        const content = (task.content || '').trim();
-        if (!content) return;
-        rows.push({
-          week_id: week.id,
-          day,
-          content,
-          is_done: Boolean(task.is_done),
-          sort_order: index,
-          updated_at: now,
-        });
-      });
-    });
 
     if (rows.length > 0) {
       const { error: insertError } = await client.from('planner_tasks').insert(rows);
@@ -189,10 +239,31 @@ async function saveWeek(weekKey, payload) {
       }
     }
 
+    const oldIds = (oldTasks || []).map((t) => t.id).filter(Boolean);
+    if (oldIds.length > 0) {
+      const { error: deleteError } = await client
+        .from('planner_tasks')
+        .delete()
+        .in('id', oldIds);
+      if (deleteError) {
+        return { ok: false, error: deleteError.message };
+      }
+    }
+
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err.message || 'SAVE_FAILED' };
   }
+}
+
+function saveWeek(weekKey, payload) {
+  const run = saveQueue.then(() => saveWeekUnlocked(weekKey, payload));
+  // 이전 실패가 다음 저장을 막지 않도록
+  saveQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
 }
 
 module.exports = {

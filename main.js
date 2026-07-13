@@ -1,5 +1,7 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const fs = require('fs');
 const { loadWeek, saveWeek, getConfig } = require('./supabaseSync');
 
@@ -140,10 +142,12 @@ ipcMain.handle('planner:saveWeek', async (_event, payload) => {
 
     const remote = await saveWeek(weekKey, weekData);
     if (!remote.ok) {
-      return { ok: false, error: remote.error, cached: true };
+      console.error('[planner:saveWeek] cloud failed:', remote.error);
+      return { ok: false, error: remote.error || 'UNKNOWN', cached: true };
     }
     return { ok: true };
   } catch (err) {
+    console.error('[planner:saveWeek] exception:', err);
     return { ok: false, error: err.message || 'SAVE_FAILED', cached: true };
   }
 });
