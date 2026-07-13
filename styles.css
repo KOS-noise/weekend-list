@@ -207,29 +207,34 @@ body {
   cursor: pointer;
 }
 
-.task-row input[type="text"] {
+.task-row textarea {
   width: 100%;
   border: none;
   border-bottom: 1px solid #ddd8cc;
   background: transparent;
   outline: none;
+  resize: none;
+  overflow: hidden;
   font-family: "Noto Sans KR", sans-serif;
   font-size: 0.8rem;
   line-height: 1.4;
   color: var(--ink);
   padding: 2px 0;
   min-height: 22px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
-.task-row input[type="text"]::placeholder {
+.task-row textarea::placeholder {
   color: #b0aaa0;
 }
 
-.task-row input[type="text"]:focus {
+.task-row textarea:focus {
   border-bottom-color: var(--ink);
 }
 
-.task-row.is-done input[type="text"] {
+.task-row.is-done textarea {
   text-decoration: line-through;
   color: var(--muted);
 }

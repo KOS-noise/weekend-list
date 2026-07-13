@@ -90,8 +90,8 @@ function createTaskRow(day, task) {
   check.type = 'checkbox';
   check.checked = Boolean(task.is_done);
 
-  const text = document.createElement('input');
-  text.type = 'text';
+  const text = document.createElement('textarea');
+  text.rows = 1;
   text.value = task.content || '';
   text.placeholder = '할 일';
 
@@ -101,13 +101,21 @@ function createTaskRow(day, task) {
   remove.setAttribute('aria-label', '삭제');
   remove.textContent = '×';
 
+  const autosize = () => {
+    text.style.height = 'auto';
+    text.style.height = `${Math.max(22, text.scrollHeight)}px`;
+  };
+
   check.addEventListener('change', () => {
     row.classList.toggle('is-done', check.checked);
     scheduleSave();
   });
-  text.addEventListener('input', scheduleSave);
+  text.addEventListener('input', () => {
+    autosize();
+    scheduleSave();
+  });
   text.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       addTask(day, true);
     }
@@ -118,6 +126,7 @@ function createTaskRow(day, task) {
   });
 
   row.append(check, text, remove);
+  requestAnimationFrame(autosize);
   return row;
 }
 
@@ -147,7 +156,7 @@ function collectWeekContent() {
     const list = document.querySelector(`[data-tasks-for="${day}"]`);
     tasks[day] = Array.from(list.querySelectorAll('.task-row')).map((row, index) => {
       const check = row.querySelector('input[type="checkbox"]');
-      const text = row.querySelector('input[type="text"]');
+      const text = row.querySelector('textarea');
       return {
         content: text.value,
         is_done: check.checked,
@@ -163,7 +172,7 @@ function addTask(day, focus = false) {
   const row = createTaskRow(day, { content: '', is_done: false });
   list.appendChild(row);
   if (focus) {
-    row.querySelector('input[type="text"]').focus();
+    row.querySelector('textarea').focus();
   }
   scheduleSave();
 }
