@@ -77,8 +77,8 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1100,
     height: 780,
-    minWidth: 420,
-    minHeight: 320,
+    minWidth: 320,
+    minHeight: 280,
     title: 'Weekly Planner',
     backgroundColor: '#e8e6e0',
     webPreferences: {
@@ -156,6 +156,19 @@ ipcMain.handle('planner:configStatus', () => {
     hasKey: Boolean(key),
     hasSyncCode: Boolean(syncCode),
   };
+});
+
+ipcMain.handle('window:setCompactMode', (_event, enabled) => {
+  const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+  if (!win) return false;
+  win.setAlwaysOnTop(Boolean(enabled), 'floating');
+  if (!enabled) {
+    const [width, height] = win.getSize();
+    if (width < 1100 || height < 780) {
+      win.setSize(Math.max(width, 1100), Math.max(height, 780), true);
+    }
+  }
+  return true;
 });
 
 ipcMain.handle('settings:get', () => getSettings());

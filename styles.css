@@ -340,3 +340,121 @@ body {
   color: var(--muted);
   min-height: 1.2em;
 }
+
+/* 작은 창: 오늘 할 일 위젯 모드 */
+body.is-compact {
+  background: var(--paper);
+}
+
+body.is-compact .page {
+  display: none;
+}
+
+body.is-compact .compact {
+  display: flex;
+}
+
+.compact {
+  display: none;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  padding: 18px 16px 14px;
+  background: var(--paper);
+  overflow: auto;
+}
+
+.compact-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.compact-label {
+  margin: 0 0 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.compact-title {
+  margin: 0;
+  font-family: "Cormorant Garamond", "Times New Roman", serif;
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.compact-date {
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.compact-expand {
+  border: 1px solid var(--line);
+  background: var(--header-bg);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 8px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.compact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.compact .task-row {
+  grid-template-columns: 22px 1fr 22px;
+  gap: 8px;
+}
+
+.compact .task-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 6px;
+}
+
+.compact .task-row textarea {
+  font-size: 1.12rem;
+  line-height: 1.45;
+  min-height: 28px;
+  border-bottom-color: #e2ddd2;
+}
+
+.compact .task-remove {
+  font-size: 1.1rem;
+  margin-top: 4px;
+}
+
+.compact-add {
+  margin-top: 14px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.compact-add:hover {
+  color: var(--ink);
+}
+
+.compact-hint {
+  margin: 12px 0 0;
+  font-size: 0.72rem;
+  color: #a39e94;
+}

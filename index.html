@@ -112,6 +112,20 @@
       <span id="saveStatus" class="save-status" aria-live="polite"></span>
     </footer>
     </div>
+
+    <aside class="compact" id="compactView" hidden>
+      <header class="compact-header">
+        <div>
+          <p class="compact-label">오늘</p>
+          <h2 class="compact-title" id="compactTitle">월요일</h2>
+          <p class="compact-date" id="compactDate"></p>
+        </div>
+        <button type="button" id="expandBtn" class="compact-expand">주간 보기</button>
+      </header>
+      <div class="compact-list" id="compactList"></div>
+      <button type="button" class="compact-add" id="compactAddBtn">+ 할 일</button>
+      <p class="compact-hint">창을 키우면 주간 계획표로 돌아갑니다</p>
+    </aside>
   </div>
 
   <script src="renderer.js"></script>
