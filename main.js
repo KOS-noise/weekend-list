@@ -93,40 +93,59 @@ function createWindow() {
 }
 
 ipcMain.handle('planner:loadWeek', async (_event, weekKey) => {
-  const remote = await loadWeek(weekKey);
-  if (remote.ok) {
-    cacheSet(weekKey, remote.data);
-    return { ok: true, source: 'supabase', data: remote.data };
-  }
+  const empty = {
+    note: '',
+    tasks: { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] },
+  };
 
-  const cached = cacheGet(weekKey);
-  if (cached) {
+  try {
+    const remote = await loadWeek(weekKey);
+    if (remote.ok) {
+      cacheSet(weekKey, remote.data);
+      return { ok: true, source: 'supabase', data: remote.data };
+    }
+
+    const cached = cacheGet(weekKey);
+    if (cached) {
+      return {
+        ok: true,
+        source: 'cache',
+        warning: remote.error,
+        data: cached,
+      };
+    }
+
     return {
-      ok: true,
-      source: 'cache',
-      warning: remote.error,
-      data: cached,
+      ok: false,
+      source: 'none',
+      error: remote.error,
+      data: empty,
+    };
+  } catch (err) {
+    const cached = cacheGet(weekKey);
+    return {
+      ok: Boolean(cached),
+      source: cached ? 'cache' : 'none',
+      error: err.message || 'LOAD_FAILED',
+      data: cached || empty,
     };
   }
-
-  return {
-    ok: false,
-    source: 'none',
-    error: remote.error,
-    data: { note: '', tasks: { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] } },
-  };
 });
 
 ipcMain.handle('planner:saveWeek', async (_event, payload) => {
-  const weekKey = payload.weekKey;
-  const weekData = { note: payload.note || '', tasks: payload.tasks || {} };
-  cacheSet(weekKey, weekData);
+  try {
+    const weekKey = payload.weekKey;
+    const weekData = { note: payload.note || '', tasks: payload.tasks || {} };
+    cacheSet(weekKey, weekData);
 
-  const remote = await saveWeek(weekKey, weekData);
-  if (!remote.ok) {
-    return { ok: false, error: remote.error, cached: true };
+    const remote = await saveWeek(weekKey, weekData);
+    if (!remote.ok) {
+      return { ok: false, error: remote.error, cached: true };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message || 'SAVE_FAILED', cached: true };
   }
-  return { ok: true };
 });
 
 ipcMain.handle('planner:configStatus', () => {

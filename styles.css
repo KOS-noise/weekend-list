@@ -210,7 +210,7 @@ body {
 .task-row input[type="text"] {
   width: 100%;
   border: none;
-  border-bottom: 1px solid transparent;
+  border-bottom: 1px solid #ddd8cc;
   background: transparent;
   outline: none;
   font-family: "Noto Sans KR", sans-serif;
@@ -218,10 +218,15 @@ body {
   line-height: 1.4;
   color: var(--ink);
   padding: 2px 0;
+  min-height: 22px;
+}
+
+.task-row input[type="text"]::placeholder {
+  color: #b0aaa0;
 }
 
 .task-row input[type="text"]:focus {
-  border-bottom-color: #cfc9bc;
+  border-bottom-color: var(--ink);
 }
 
 .task-row.is-done input[type="text"] {

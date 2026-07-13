@@ -220,28 +220,7 @@ async function showWeek(baseDate) {
   }
 }
 
-async function init() {
-  const week = getWeekFor();
-  applyWeekDates(week);
-
-  const [config, settings, loaded] = await Promise.all([
-    window.plannerAPI.configStatus(),
-    window.plannerAPI.getSettings(),
-    window.plannerAPI.loadWeek(week.weekKey),
-  ]);
-
-  if (!config.configured) {
-    showStatus('.env 설정 필요 (URL / KEY / SYNC_CODE)', true);
-  }
-
-  renderTasks(loaded.data);
-  if (loaded.ok && loaded.source === 'supabase') {
-    showStatus('동기화됨');
-  } else if (loaded.ok && loaded.source === 'cache') {
-    showStatus('오프라인 캐시', true);
-  }
-
-  autoStartToggle.checked = Boolean(settings.autoStart);
+function bindUi() {
   noteInput.addEventListener('input', scheduleSave);
 
   document.querySelectorAll('[data-add]').forEach((btn) => {
@@ -269,6 +248,40 @@ async function init() {
     autoStartToggle.checked = Boolean(next.autoStart);
     showStatus(next.autoStart ? '자동 실행이 켜졌습니다' : '자동 실행이 꺼졌습니다');
   });
+}
+
+async function init() {
+  const week = getWeekFor();
+  applyWeekDates(week);
+  // 클라우드 실패해도 입력칸은 먼저 그림
+  renderTasks(emptyWeekData());
+  bindUi();
+
+  try {
+    const [config, settings, loaded] = await Promise.all([
+      window.plannerAPI.configStatus(),
+      window.plannerAPI.getSettings(),
+      window.plannerAPI.loadWeek(week.weekKey),
+    ]);
+
+    autoStartToggle.checked = Boolean(settings.autoStart);
+
+    if (!config.configured) {
+      showStatus('.env 설정 필요 (URL / KEY / SYNC_CODE)', true);
+    }
+
+    renderTasks(loaded?.data || emptyWeekData());
+
+    if (loaded?.ok && loaded.source === 'supabase') {
+      showStatus('동기화됨');
+    } else if (loaded?.ok && loaded.source === 'cache') {
+      showStatus('오프라인 캐시', true);
+    } else if (loaded?.error) {
+      showStatus(`불러오기 실패: ${loaded.error}`, true);
+    }
+  } catch (err) {
+    showStatus(`초기화 오류: ${err.message || err}`, true);
+  }
 }
 
 init();

@@ -8,10 +8,31 @@ function emptyTasks() {
   return Object.fromEntries(DAY_KEYS.map((key) => [key, []]));
 }
 
+function cleanEnv(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .trim();
+}
+
+function normalizeSupabaseUrl(raw) {
+  let url = cleanEnv(raw);
+  if (!url) return '';
+
+  // 프로젝트 ref만 넣은 경우 → https://xxxx.supabase.co
+  if (!/^https?:\/\//i.test(url) && !url.includes('.')) {
+    url = `https://${url}.supabase.co`;
+  } else if (!/^https?:\/\//i.test(url)) {
+    url = `https://${url}`;
+  }
+
+  return url.replace(/\/+$/, '');
+}
+
 function getConfig() {
-  const url = (process.env.SUPABASE_URL || '').trim();
-  const key = (process.env.SUPABASE_ANON_KEY || '').trim();
-  const syncCode = (process.env.SYNC_CODE || '').trim();
+  const url = normalizeSupabaseUrl(process.env.SUPABASE_URL);
+  const key = cleanEnv(process.env.SUPABASE_ANON_KEY);
+  const syncCode = cleanEnv(process.env.SYNC_CODE);
   return { url, key, syncCode };
 }
 
@@ -20,11 +41,27 @@ function createSupabase() {
   if (!url || !key || !syncCode) {
     return { client: null, syncCode: null, error: 'MISSING_ENV' };
   }
-  return {
-    client: createClient(url, key),
-    syncCode,
-    error: null,
-  };
+  if (!/^https?:\/\//i.test(url)) {
+    return {
+      client: null,
+      syncCode: null,
+      error: 'INVALID_URL (.env의 SUPABASE_URL은 https://프로젝트ID.supabase.co 형식이어야 합니다)',
+    };
+  }
+
+  try {
+    return {
+      client: createClient(url, key),
+      syncCode,
+      error: null,
+    };
+  } catch (err) {
+    return {
+      client: null,
+      syncCode: null,
+      error: err.message || 'SUPABASE_CLIENT_ERROR',
+    };
+  }
 }
 
 function normalizeWeekPayload(note, taskRows) {
@@ -50,32 +87,44 @@ async function loadWeek(weekKey) {
     return { ok: false, error, data: { note: '', tasks: emptyTasks() } };
   }
 
-  const { data: week, error: weekError } = await client
-    .from('planner_weeks')
-    .select('id, note')
-    .eq('sync_code', syncCode)
-    .eq('week_key', weekKey)
-    .maybeSingle();
+  try {
+    const { data: week, error: weekError } = await client
+      .from('planner_weeks')
+      .select('id, note')
+      .eq('sync_code', syncCode)
+      .eq('week_key', weekKey)
+      .maybeSingle();
 
-  if (weekError) {
-    return { ok: false, error: weekError.message, data: { note: '', tasks: emptyTasks() } };
+    if (weekError) {
+      return { ok: false, error: weekError.message, data: { note: '', tasks: emptyTasks() } };
+    }
+
+    if (!week) {
+      return { ok: true, data: { note: '', tasks: emptyTasks() } };
+    }
+
+    const { data: taskRows, error: taskError } = await client
+      .from('planner_tasks')
+      .select('id, day, content, is_done, sort_order')
+      .eq('week_id', week.id)
+      .order('sort_order', { ascending: true });
+
+    if (taskError) {
+      return {
+        ok: false,
+        error: taskError.message,
+        data: { note: week.note || '', tasks: emptyTasks() },
+      };
+    }
+
+    return { ok: true, data: normalizeWeekPayload(week.note, taskRows) };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err.message || 'LOAD_FAILED',
+      data: { note: '', tasks: emptyTasks() },
+    };
   }
-
-  if (!week) {
-    return { ok: true, data: { note: '', tasks: emptyTasks() } };
-  }
-
-  const { data: taskRows, error: taskError } = await client
-    .from('planner_tasks')
-    .select('id, day, content, is_done, sort_order')
-    .eq('week_id', week.id)
-    .order('sort_order', { ascending: true });
-
-  if (taskError) {
-    return { ok: false, error: taskError.message, data: { note: week.note || '', tasks: emptyTasks() } };
-  }
-
-  return { ok: true, data: normalizeWeekPayload(week.note, taskRows) };
 }
 
 async function saveWeek(weekKey, payload) {
@@ -84,62 +133,66 @@ async function saveWeek(weekKey, payload) {
     return { ok: false, error };
   }
 
-  const note = payload?.note || '';
-  const tasksByDay = payload?.tasks || emptyTasks();
-  const now = new Date().toISOString();
+  try {
+    const note = payload?.note || '';
+    const tasksByDay = payload?.tasks || emptyTasks();
+    const now = new Date().toISOString();
 
-  const { data: week, error: upsertError } = await client
-    .from('planner_weeks')
-    .upsert(
-      {
-        sync_code: syncCode,
-        week_key: weekKey,
-        note,
-        updated_at: now,
-      },
-      { onConflict: 'sync_code,week_key' }
-    )
-    .select('id')
-    .single();
+    const { data: week, error: upsertError } = await client
+      .from('planner_weeks')
+      .upsert(
+        {
+          sync_code: syncCode,
+          week_key: weekKey,
+          note,
+          updated_at: now,
+        },
+        { onConflict: 'sync_code,week_key' }
+      )
+      .select('id')
+      .single();
 
-  if (upsertError) {
-    return { ok: false, error: upsertError.message };
-  }
+    if (upsertError) {
+      return { ok: false, error: upsertError.message };
+    }
 
-  const { error: deleteError } = await client
-    .from('planner_tasks')
-    .delete()
-    .eq('week_id', week.id);
+    const { error: deleteError } = await client
+      .from('planner_tasks')
+      .delete()
+      .eq('week_id', week.id);
 
-  if (deleteError) {
-    return { ok: false, error: deleteError.message };
-  }
+    if (deleteError) {
+      return { ok: false, error: deleteError.message };
+    }
 
-  const rows = [];
-  DAY_KEYS.forEach((day) => {
-    const list = Array.isArray(tasksByDay[day]) ? tasksByDay[day] : [];
-    list.forEach((task, index) => {
-      const content = (task.content || '').trim();
-      if (!content) return;
-      rows.push({
-        week_id: week.id,
-        day,
-        content,
-        is_done: Boolean(task.is_done),
-        sort_order: index,
-        updated_at: now,
+    const rows = [];
+    DAY_KEYS.forEach((day) => {
+      const list = Array.isArray(tasksByDay[day]) ? tasksByDay[day] : [];
+      list.forEach((task, index) => {
+        const content = (task.content || '').trim();
+        if (!content) return;
+        rows.push({
+          week_id: week.id,
+          day,
+          content,
+          is_done: Boolean(task.is_done),
+          sort_order: index,
+          updated_at: now,
+        });
       });
     });
-  });
 
-  if (rows.length > 0) {
-    const { error: insertError } = await client.from('planner_tasks').insert(rows);
-    if (insertError) {
-      return { ok: false, error: insertError.message };
+    if (rows.length > 0) {
+      const { error: insertError } = await client.from('planner_tasks').insert(rows);
+      if (insertError) {
+        return { ok: false, error: insertError.message };
+      }
     }
-  }
 
-  return { ok: true };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message || 'SAVE_FAILED' };
+  }
 }
 
 module.exports = {
