@@ -229,6 +229,22 @@ async function showWeek(baseDate) {
   }
 }
 
+function fitToWindow() {
+  const page = document.getElementById('page');
+  if (!page) return;
+
+  const pad = 16;
+  const designW = 1080;
+  const designH = 740;
+  const scale = Math.min(
+    1,
+    (window.innerWidth - pad) / designW,
+    (window.innerHeight - pad) / designH
+  );
+
+  page.style.transform = `scale(${scale})`;
+}
+
 function bindUi() {
   noteInput.addEventListener('input', scheduleSave);
 
@@ -257,6 +273,9 @@ function bindUi() {
     autoStartToggle.checked = Boolean(next.autoStart);
     showStatus(next.autoStart ? '자동 실행이 켜졌습니다' : '자동 실행이 꺼졌습니다');
   });
+
+  window.addEventListener('resize', fitToWindow);
+  fitToWindow();
 }
 
 async function init() {

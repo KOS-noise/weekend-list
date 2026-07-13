@@ -77,10 +77,10 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1100,
     height: 780,
-    minWidth: 800,
-    minHeight: 600,
+    minWidth: 420,
+    minHeight: 320,
     title: 'Weekly Planner',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#e8e6e0',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
