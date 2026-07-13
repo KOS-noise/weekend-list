@@ -7,14 +7,11 @@ const saveStatus = document.getElementById('saveStatus');
 const prevWeekBtn = document.getElementById('prevWeekBtn');
 const nextWeekBtn = document.getElementById('nextWeekBtn');
 const thisWeekBtn = document.getElementById('thisWeekBtn');
-const dayInputs = Object.fromEntries(
-  DAY_KEYS.map((key) => [key, document.querySelector(`textarea[data-key="${key}"]`)])
-);
 
 let saveTimer = null;
 let currentWeek = null;
 let viewedMonday = null;
-let allWeeks = {};
+let weekData = emptyWeekData();
 
 function pad(n) {
   return String(n).padStart(2, '0');
@@ -41,11 +38,9 @@ function getMondayOf(date) {
   return monday;
 }
 
-/** 특정 날짜가 속한 주 (월~일) */
 function getWeekFor(base = new Date()) {
   const today = startOfDay(new Date());
   const monday = getMondayOf(base);
-
   const days = {};
   DAY_KEYS.forEach((key, i) => {
     const d = new Date(monday);
@@ -64,8 +59,8 @@ function getWeekFor(base = new Date()) {
 
 function emptyWeekData() {
   return {
-    days: Object.fromEntries(DAY_KEYS.map((key) => [key, ''])),
     note: '',
+    tasks: Object.fromEntries(DAY_KEYS.map((key) => [key, []])),
   };
 }
 
@@ -82,96 +77,175 @@ function applyWeekDates(week) {
     const el = document.querySelector(`[data-date-for="${key}"]`);
     const d = week.days[key];
     el.textContent = `${d.getMonth() + 1}/${d.getDate()}`;
-
     const col = document.querySelector(`.day-col[data-day="${key}"]`);
     col.classList.toggle('is-today', formatKey(d) === week.todayKey);
   });
 }
 
-function applyWeekContent(weekData) {
-  const data = weekData || emptyWeekData();
-  noteInput.value = data.note || '';
-  DAY_KEYS.forEach((key) => {
-    dayInputs[key].value = (data.days && data.days[key]) || '';
+function createTaskRow(day, task) {
+  const row = document.createElement('div');
+  row.className = 'task-row' + (task.is_done ? ' is-done' : '');
+
+  const check = document.createElement('input');
+  check.type = 'checkbox';
+  check.checked = Boolean(task.is_done);
+
+  const text = document.createElement('input');
+  text.type = 'text';
+  text.value = task.content || '';
+  text.placeholder = '할 일';
+
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'task-remove';
+  remove.setAttribute('aria-label', '삭제');
+  remove.textContent = '×';
+
+  check.addEventListener('change', () => {
+    row.classList.toggle('is-done', check.checked);
+    scheduleSave();
+  });
+  text.addEventListener('input', scheduleSave);
+  text.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTask(day, true);
+    }
+  });
+  remove.addEventListener('click', () => {
+    row.remove();
+    scheduleSave();
+  });
+
+  row.append(check, text, remove);
+  return row;
+}
+
+function renderTasks(data) {
+  weekData = {
+    note: data?.note || '',
+    tasks: {},
+  };
+  noteInput.value = weekData.note;
+
+  DAY_KEYS.forEach((day) => {
+    const list = document.querySelector(`[data-tasks-for="${day}"]`);
+    list.innerHTML = '';
+    const tasks = Array.isArray(data?.tasks?.[day]) ? data.tasks[day] : [];
+    weekData.tasks[day] = tasks;
+    if (tasks.length === 0) {
+      list.appendChild(createTaskRow(day, { content: '', is_done: false }));
+    } else {
+      tasks.forEach((task) => list.appendChild(createTaskRow(day, task)));
+    }
   });
 }
 
 function collectWeekContent() {
-  return {
-    days: Object.fromEntries(DAY_KEYS.map((key) => [key, dayInputs[key].value])),
-    note: noteInput.value,
-  };
+  const tasks = {};
+  DAY_KEYS.forEach((day) => {
+    const list = document.querySelector(`[data-tasks-for="${day}"]`);
+    tasks[day] = Array.from(list.querySelectorAll('.task-row')).map((row, index) => {
+      const check = row.querySelector('input[type="checkbox"]');
+      const text = row.querySelector('input[type="text"]');
+      return {
+        content: text.value,
+        is_done: check.checked,
+        sort_order: index,
+      };
+    });
+  });
+  return { note: noteInput.value, tasks };
 }
 
-function normalizeStored(raw) {
-  if (raw && raw.weeks && typeof raw.weeks === 'object') {
-    return raw.weeks;
+function addTask(day, focus = false) {
+  const list = document.querySelector(`[data-tasks-for="${day}"]`);
+  const row = createTaskRow(day, { content: '', is_done: false });
+  list.appendChild(row);
+  if (focus) {
+    row.querySelector('input[type="text"]').focus();
   }
-
-  if (raw && (raw.days || raw.note || raw.date)) {
-    const week = getWeekFor();
-    return {
-      [week.weekKey]: {
-        days: raw.days || emptyWeekData().days,
-        note: raw.note || '',
-      },
-    };
-  }
-
-  return {};
+  scheduleSave();
 }
 
-function showSaved() {
-  saveStatus.textContent = '저장됨';
-  window.clearTimeout(showSaved._t);
-  showSaved._t = window.setTimeout(() => {
-    saveStatus.textContent = '';
-  }, 1200);
+function showStatus(message, sticky = false) {
+  saveStatus.textContent = message;
+  window.clearTimeout(showStatus._t);
+  if (!sticky) {
+    showStatus._t = window.setTimeout(() => {
+      saveStatus.textContent = '';
+    }, 1600);
+  }
 }
 
 async function flushSave() {
-  if (!currentWeek) return;
+  if (!currentWeek) return { ok: true };
   window.clearTimeout(saveTimer);
-  allWeeks[currentWeek.weekKey] = collectWeekContent();
-  await window.plannerAPI.save({
-    version: 2,
-    weeks: allWeeks,
-  });
+  const payload = {
+    weekKey: currentWeek.weekKey,
+    ...collectWeekContent(),
+  };
+  weekData = { note: payload.note, tasks: payload.tasks };
+  const result = await window.plannerAPI.saveWeek(payload);
+  return result;
 }
 
 function scheduleSave() {
   if (!currentWeek) return;
-  saveStatus.textContent = '저장 중…';
+  showStatus('저장 중…', true);
   window.clearTimeout(saveTimer);
   saveTimer = window.setTimeout(async () => {
-    await flushSave();
-    showSaved();
-  }, 350);
+    const result = await flushSave();
+    if (result.ok) {
+      showStatus('클라우드 저장됨');
+    } else {
+      showStatus(result.cached ? '로컬만 저장됨' : `저장 실패: ${result.error || ''}`, true);
+    }
+  }, 450);
 }
 
 async function showWeek(baseDate) {
   await flushSave();
   const week = getWeekFor(baseDate);
   applyWeekDates(week);
-  applyWeekContent(allWeeks[week.weekKey]);
+  showStatus('불러오는 중…', true);
+  const result = await window.plannerAPI.loadWeek(week.weekKey);
+  renderTasks(result.data);
+  if (result.ok && result.source === 'supabase') {
+    showStatus('동기화됨');
+  } else if (result.ok && result.source === 'cache') {
+    showStatus('오프라인 캐시', true);
+  } else {
+    showStatus(`불러오기 실패: ${result.error || '설정 확인'}`, true);
+  }
 }
 
 async function init() {
   const week = getWeekFor();
   applyWeekDates(week);
 
-  const [raw, settings] = await Promise.all([
-    window.plannerAPI.load(),
+  const [config, settings, loaded] = await Promise.all([
+    window.plannerAPI.configStatus(),
     window.plannerAPI.getSettings(),
+    window.plannerAPI.loadWeek(week.weekKey),
   ]);
 
-  allWeeks = normalizeStored(raw);
-  applyWeekContent(allWeeks[week.weekKey]);
+  if (!config.configured) {
+    showStatus('.env 설정 필요 (URL / KEY / SYNC_CODE)', true);
+  }
+
+  renderTasks(loaded.data);
+  if (loaded.ok && loaded.source === 'supabase') {
+    showStatus('동기화됨');
+  } else if (loaded.ok && loaded.source === 'cache') {
+    showStatus('오프라인 캐시', true);
+  }
 
   autoStartToggle.checked = Boolean(settings.autoStart);
+  noteInput.addEventListener('input', scheduleSave);
 
-  [noteInput, ...Object.values(dayInputs)].forEach((el) => {
-    el.addEventListener('input', scheduleSave);
+  document.querySelectorAll('[data-add]').forEach((btn) => {
+    btn.addEventListener('click', () => addTask(btn.getAttribute('data-add'), true));
   });
 
   prevWeekBtn.addEventListener('click', async () => {
@@ -193,9 +267,7 @@ async function init() {
   autoStartToggle.addEventListener('change', async () => {
     const next = await window.plannerAPI.setAutoStart(autoStartToggle.checked);
     autoStartToggle.checked = Boolean(next.autoStart);
-    saveStatus.textContent = next.autoStart
-      ? '자동 실행이 켜졌습니다'
-      : '자동 실행이 꺼졌습니다';
+    showStatus(next.autoStart ? '자동 실행이 켜졌습니다' : '자동 실행이 꺼졌습니다');
   });
 }
 

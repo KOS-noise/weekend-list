@@ -19,6 +19,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "supabaseSync.js",
       "index.html",
       "styles.css",
       "renderer.js",

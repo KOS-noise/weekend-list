@@ -1,6 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { loadWeek, saveWeek, getConfig } = require('./supabaseSync');
 
 const SETTINGS_FILE = () => path.join(app.getPath('userData'), 'settings.json');
 const DATA_FILE = () => path.join(app.getPath('userData'), 'planner-data.json');
@@ -36,6 +37,19 @@ function setAutoStart(enabled) {
     path: process.execPath,
     args: [],
   });
+}
+
+function cacheGet(weekKey) {
+  const all = readJson(DATA_FILE(), { version: 3, weeks: {} });
+  return all.weeks?.[weekKey] || null;
+}
+
+function cacheSet(weekKey, weekData) {
+  const all = readJson(DATA_FILE(), { version: 3, weeks: {} });
+  if (!all.weeks) all.weeks = {};
+  all.weeks[weekKey] = weekData;
+  all.version = 3;
+  writeJson(DATA_FILE(), all);
 }
 
 async function askAutoStartOnFirstRun() {
@@ -78,25 +92,51 @@ function createWindow() {
   win.loadFile('index.html');
 }
 
-ipcMain.handle('planner:load', () => {
-  return readJson(DATA_FILE(), {
-    date: '',
-    days: {
-      mon: '',
-      tue: '',
-      wed: '',
-      thu: '',
-      fri: '',
-      sat: '',
-      sun: '',
-    },
-    note: '',
-  });
+ipcMain.handle('planner:loadWeek', async (_event, weekKey) => {
+  const remote = await loadWeek(weekKey);
+  if (remote.ok) {
+    cacheSet(weekKey, remote.data);
+    return { ok: true, source: 'supabase', data: remote.data };
+  }
+
+  const cached = cacheGet(weekKey);
+  if (cached) {
+    return {
+      ok: true,
+      source: 'cache',
+      warning: remote.error,
+      data: cached,
+    };
+  }
+
+  return {
+    ok: false,
+    source: 'none',
+    error: remote.error,
+    data: { note: '', tasks: { mon: [], tue: [], wed: [], thu: [], fri: [], sat: [], sun: [] } },
+  };
 });
 
-ipcMain.handle('planner:save', (_event, data) => {
-  writeJson(DATA_FILE(), data);
-  return true;
+ipcMain.handle('planner:saveWeek', async (_event, payload) => {
+  const weekKey = payload.weekKey;
+  const weekData = { note: payload.note || '', tasks: payload.tasks || {} };
+  cacheSet(weekKey, weekData);
+
+  const remote = await saveWeek(weekKey, weekData);
+  if (!remote.ok) {
+    return { ok: false, error: remote.error, cached: true };
+  }
+  return { ok: true };
+});
+
+ipcMain.handle('planner:configStatus', () => {
+  const { url, key, syncCode } = getConfig();
+  return {
+    configured: Boolean(url && key && syncCode),
+    hasUrl: Boolean(url),
+    hasKey: Boolean(key),
+    hasSyncCode: Boolean(syncCode),
+  };
 });
 
 ipcMain.handle('settings:get', () => getSettings());

@@ -178,7 +178,87 @@ body {
   font-weight: 700;
 }
 
-.day-body,
+.day-panel {
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 4px 4px;
+  overflow: auto;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.task-row {
+  display: grid;
+  grid-template-columns: 16px 1fr 16px;
+  gap: 4px;
+  align-items: start;
+}
+
+.task-row input[type="checkbox"] {
+  margin-top: 4px;
+  accent-color: var(--ink);
+  cursor: pointer;
+}
+
+.task-row input[type="text"] {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  outline: none;
+  font-family: "Noto Sans KR", sans-serif;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--ink);
+  padding: 2px 0;
+}
+
+.task-row input[type="text"]:focus {
+  border-bottom-color: #cfc9bc;
+}
+
+.task-row.is-done input[type="text"] {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.task-remove {
+  border: none;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 2px 0 0;
+}
+
+.task-remove:hover {
+  color: var(--ink);
+}
+
+.add-task {
+  margin-top: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.72rem;
+  text-align: left;
+  cursor: pointer;
+  padding: 2px 2px;
+}
+
+.add-task:hover {
+  color: var(--ink);
+}
+
 .note-body {
   width: 100%;
   height: 100%;
@@ -186,11 +266,12 @@ body {
   resize: none;
   outline: none;
   background: transparent;
-  padding: 10px 8px;
+  padding: 8px 12px 12px;
   font-family: "Noto Sans KR", sans-serif;
   font-size: 0.88rem;
   line-height: 1.55;
   color: var(--ink);
+  min-height: 110px;
 }
 
 .note-box {
@@ -205,11 +286,6 @@ body {
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.06em;
-}
-
-.note-body {
-  padding: 8px 12px 12px;
-  min-height: 110px;
 }
 
 .footer {
