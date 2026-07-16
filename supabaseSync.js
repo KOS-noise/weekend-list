@@ -187,6 +187,18 @@ async function ensureWeekId(client, syncCode, weekKey, note, now) {
   return inserted.id;
 }
 
+function countContentfulTasks(tasksByDay) {
+  if (!tasksByDay || typeof tasksByDay !== 'object') return 0;
+  let count = 0;
+  DAY_KEYS.forEach((day) => {
+    const list = Array.isArray(tasksByDay[day]) ? tasksByDay[day] : [];
+    list.forEach((task) => {
+      if (String(task?.content || '').trim()) count += 1;
+    });
+  });
+  return count;
+}
+
 function buildTaskRows(weekId, tasksByDay, now) {
   const rows = [];
   DAY_KEYS.forEach((day) => {
@@ -222,7 +234,13 @@ async function saveWeekUnlocked(weekKey, payload) {
     const weekId = await ensureWeekId(client, syncCode, weekKey, note, now);
     const rows = buildTaskRows(weekId, tasksByDay, now);
 
-    // 기존 할 일 id를 기억해 두고, 새 행 insert 성공 후에만 삭제 (중간 실패 시 데이터 보존)
+    // 내용 있는 할 일이 0개면 note만 갱신하고 기존 tasks는 절대 지우지 않는다.
+    // (빈 화면 자동저장이 클라우드 일정을 통째로 날리던 버그 방지)
+    if (rows.length === 0) {
+      return { ok: true, preservedTasks: true };
+    }
+
+    // 기존 할 일 id를 기억해 두고, 새 행 insert 성공 후에만 삭제
     const { data: oldTasks, error: oldError } = await client
       .from('planner_tasks')
       .select('id')
@@ -232,11 +250,9 @@ async function saveWeekUnlocked(weekKey, payload) {
       return { ok: false, error: oldError.message };
     }
 
-    if (rows.length > 0) {
-      const { error: insertError } = await client.from('planner_tasks').insert(rows);
-      if (insertError) {
-        return { ok: false, error: insertError.message };
-      }
+    const { error: insertError } = await client.from('planner_tasks').insert(rows);
+    if (insertError) {
+      return { ok: false, error: insertError.message };
     }
 
     const oldIds = (oldTasks || []).map((t) => t.id).filter(Boolean);
@@ -269,6 +285,7 @@ function saveWeek(weekKey, payload) {
 module.exports = {
   DAY_KEYS,
   emptyTasks,
+  countContentfulTasks,
   loadWeek,
   saveWeek,
   getConfig,

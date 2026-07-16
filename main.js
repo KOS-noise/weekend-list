@@ -3,7 +3,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const fs = require('fs');
-const { loadWeek, saveWeek, getConfig } = require('./supabaseSync');
+const { loadWeek, saveWeek, getConfig, countContentfulTasks } = require('./supabaseSync');
 
 const SETTINGS_FILE = () => path.join(app.getPath('userData'), 'settings.json');
 const DATA_FILE = () => path.join(app.getPath('userData'), 'planner-data.json');
@@ -102,12 +102,29 @@ ipcMain.handle('planner:loadWeek', async (_event, weekKey) => {
 
   try {
     const remote = await loadWeek(weekKey);
+    const cached = cacheGet(weekKey);
+
     if (remote.ok) {
+      const remoteCount = countContentfulTasks(remote.data?.tasks);
+      const cachedCount = countContentfulTasks(cached?.tasks);
+      // 클라우드가 비어 있는데 로컬에 할 일이 있으면 덮어쓰지 않고, 로컬 → 클라우드 복구 시도
+      if (remoteCount === 0 && cachedCount > 0) {
+        saveWeek(weekKey, cached).then((result) => {
+          if (!result.ok) {
+            console.error('[planner:loadWeek] heal cloud from local failed:', result.error);
+          }
+        });
+        return {
+          ok: true,
+          source: 'cache',
+          warning: 'REMOTE_EMPTY_KEPT_LOCAL',
+          data: cached,
+        };
+      }
       cacheSet(weekKey, remote.data);
       return { ok: true, source: 'supabase', data: remote.data };
     }
 
-    const cached = cacheGet(weekKey);
     if (cached) {
       return {
         ok: true,
